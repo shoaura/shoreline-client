@@ -53,7 +53,10 @@ public final class ResourcePackExt implements ResourcePack, ModResourcePack
         return this.parent.open(type, id);
     }
 
-    private static native Object getResourceInternal(Object name);
+    private static Object getResourceInternal(Object name)
+    {
+        return null;
+    }
 
     @Override
     public void findResources(ResourceType type,

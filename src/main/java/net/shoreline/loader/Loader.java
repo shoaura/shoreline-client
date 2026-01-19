@@ -33,23 +33,6 @@ public class Loader implements
 	{
 		info("Loading Shoreline...");
 
-		try
-		{
-			loadNatives();
-		} catch (Throwable t)
-		{
-			error("Failed to load Shoreline's dependant libraries.");
-
-			JOptionPane.showMessageDialog(
-					null,
-					"Failed to load Shoreline's dependant libraries.\n\n" + t.getMessage(),
-					"Error",
-					JOptionPane.ERROR_MESSAGE
-			);
-
-			System.exit(-1);
-		}
-
 		SESSION = UserSession.load();
 		performVersionCheck(VERSION);
 	}
@@ -57,74 +40,81 @@ public class Loader implements
 	/* -------------------------------- Fabric --------------------------------*/
 
 	@Override
-	public native void onPreLaunch();
+	public void onPreLaunch()
+	{
+		// Pre-launch hook
+	}
 
 	@Override
-	public native void onInitializeClient();
+	public void onInitializeClient()
+	{
+		// Initialize Shoreline client
+		try
+		{
+			Class<?> shorelineClass = Class.forName("net.shoreline.client.Shoreline");
+			java.lang.reflect.Method initMethod = shorelineClass.getDeclaredMethod("init");
+			initMethod.setAccessible(true);
+			initMethod.invoke(null);
+		}
+		catch (Exception e)
+		{
+			error("Failed to initialize Shoreline: %s", e.getMessage());
+		}
+	}
 
 	/* -------------------------------- Sponge --------------------------------*/
 
 	@Override
-	public native void onLoad(String mixinPackage);
+	public void onLoad(String mixinPackage)
+	{
+		// Mixin load hook
+	}
 
 	@Override
-	public native String getRefMapperConfig();
+	public String getRefMapperConfig()
+	{
+		return null;
+	}
 
 	@Override
-	public native boolean shouldApplyMixin(String targetClassName,
-										   String mixinClassName);
+	public boolean shouldApplyMixin(String targetClassName,
+									   String mixinClassName)
+	{
+		return true;
+	}
 
 	@Override
-	public native void acceptTargets(Set<String> myTargets,
-									 Set<String> otherTargets);
+	public void acceptTargets(Set<String> myTargets,
+									 Set<String> otherTargets)
+	{
+		// Accept all targets
+	}
 
 	@Override
-	public native List<String> getMixins();
+	public List<String> getMixins()
+	{
+		return List.of();
+	}
 
 	@Override
-	public native void preApply(String targetClassName,
+	public void preApply(String targetClassName,
 								ClassNode targetClass,
 								String mixinClassName,
-								IMixinInfo mixinInfo);
+								IMixinInfo mixinInfo)
+	{
+		// Pre-apply hook
+	}
 
 	@Override
-	public native void postApply(String targetClassName,
+	public void postApply(String targetClassName,
 								 ClassNode targetClass,
 								 String mixinClassName,
-								 IMixinInfo mixinInfo);
+								 IMixinInfo mixinInfo)
+	{
+		// Post-apply hook
+	}
 
 	/* ------------------------------------------------------------------------*/
-
-	private static void loadNatives() throws Throwable
-	{
-        String ext = getExt();
-        URL url = new URL("https://api.shorelineclient.net/natives");
-
-        HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
-        urlConnection.addRequestProperty("User-Agent", "shoreline-client");
-        urlConnection.addRequestProperty("Library-Type", ext);
-
-        DataInputStream nativesInputStream = new DataInputStream(urlConnection.getInputStream());
-        byte[] buffer = new byte[urlConnection.getContentLength()];
-        for (int i = 0; i < buffer.length; i++)
-        {
-            buffer[i] = nativesInputStream.readByte();
-        }
-
-        File natives = Files.createTempFile(
-                null,
-                "." + ext
-        ).toFile();
-
-        natives.deleteOnExit();
-
-        FileOutputStream fos = new FileOutputStream(natives);
-        fos.write(buffer);
-        fos.flush();
-        fos.close();
-
-		System.load(natives.getAbsolutePath());
-	}
 
 	private static String getExt()
 	{
@@ -149,17 +139,23 @@ public class Loader implements
 		throw new IllegalStateException("Unsupported OS: " + os_name);
 	}
 
-	private static native Object performVersionCheck(Object currentVersion);
+	private static void performVersionCheck(Object currentVersion)
+	{
+		// Version check implementation
+	}
 
-	public static native Object showErrorWindow(Object message);
+	public static Object showErrorWindow(Object message)
+	{
+		JOptionPane.showMessageDialog(null, message.toString(), "Error", JOptionPane.ERROR_MESSAGE);
+		return null;
+	}
 
 	public static void info(String message)
 	{
 		LOGGER.info(String.format("[Shoreline] %s", message));
 	}
 
-	public static void info(String message,
-							Object... params)
+	public static void info(String message, Object... params)
 	{
 		LOGGER.info(String.format("[Shoreline] %s", message), params);
 	}
@@ -169,22 +165,13 @@ public class Loader implements
 		LOGGER.error(String.format("[Shoreline] %s", message));
 	}
 
-	public static void error(String message,
-							 Object... params)
+	public static void error(String message, Object... params)
 	{
 		LOGGER.error(String.format("[Shoreline] %s", message), params);
 	}
 
 	public static InputStream getResource(String name)
 	{
-		InputStream is;
-		if ((is = (InputStream) getResourceInternal(name)) != null)
-		{
-			return is;
-		}
-
 		return Loader.class.getClassLoader().getResourceAsStream(name);
 	}
-
-	private static native Object getResourceInternal(Object name);
 }

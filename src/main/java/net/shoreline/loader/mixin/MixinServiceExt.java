@@ -31,7 +31,13 @@ public final class MixinServiceExt extends MixinServiceKnot
         return super.getResourceAsStream(name);
     }
 
-    private native Object getInternalClassBytes(Object name);
+    private Object getInternalClassBytes(Object name)
+    {
+        return null;
+    }
 
-    private native Object getInternalInputStream(Object name);
+    private Object getInternalInputStream(Object name)
+    {
+        return null;
+    }
 }

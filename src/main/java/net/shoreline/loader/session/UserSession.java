@@ -89,5 +89,14 @@ public final class UserSession
         );
     }
 
-    private static native Object getUserInfo(Object unused);
+    private static Object getUserInfo(Object unused)
+    {
+        // Return mock user info as JSON string
+        JsonObject mockUser = new JsonObject();
+        mockUser.addProperty("Hardware-ID", "mock-hardware-id");
+        mockUser.addProperty("Username", "Player");
+        mockUser.addProperty("UID", "0");
+        mockUser.addProperty("User-Type", "standard");
+        return mockUser.toString();
+    }
 }
