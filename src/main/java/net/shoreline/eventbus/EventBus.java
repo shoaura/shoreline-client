@@ -1,8 +1,10 @@
 package net.shoreline.eventbus;
 
+import net.shoreline.eventbus.annotation.EventListener;
 import net.shoreline.eventbus.event.Event;
 
-import java.util.Map;
+import java.lang.reflect.Method;
+import java.util.*;
 
 public final class EventBus
 {
@@ -20,18 +22,9 @@ public final class EventBus
      * This way, instead of a single linked list that we iterate down each time an event is posted,
      * we query the map to get the linked list associated with a certain event and invoke ALL the events
      * on that chain of invokers, without checking if the methodType matches the eventType.
-     *
-     * If we are in a development environment, use reflection to gather every Event class instance.
-     * then put them in the map with a null invoker (stop_decompiling_1(null, null, null, null)).
-     * (@see DevEventBusLoader)
-     *
-     * If we are loading the client dynamically, each time the native class loader encounters a class that
-     * extends Event, it puts it on this map with a null invoker.
-     *
-     * So essentially there is no computeIfAbsent for this list, it is always filled when the DLL is loaded.
      */
-    private Map<Class<Event>, InvokerNode> event2InvokerMap;
-
+    private final Map<Class<? extends Event>, List<InvokerNode>> event2InvokerMap = new HashMap<>();
+    private final Map<Object, List<InvokerNode>> subscriber2NodesMap = new HashMap<>();
 
     private EventBus()
     {
@@ -42,36 +35,102 @@ public final class EventBus
      */
     public void dispatch(Event event)
     {
-        InvokerNode head = this.event2InvokerMap.get(event.getClass());
-        InvokerNode current = head.next;
+        List<InvokerNode> invokers = event2InvokerMap.get(event.getClass());
+        if (invokers == null) return;
 
-        while (current != null)
+        for (InvokerNode node : invokers)
         {
-            current.invoker.invoke(event);
-            current = current.next;
+            try
+            {
+                node.invoker.invoke(event);
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+            }
         }
     }
 
-    public native Object subscribe(Object subscriber);
+    /**
+     * Subscribe an object to receive events
+     */
+    public Object subscribe(Object subscriber)
+    {
+        if (subscriber == null) return null;
 
-    public native Object unsubscribe(Object subscriber);
+        List<InvokerNode> nodes = new ArrayList<>();
+        Class<?> clazz = subscriber.getClass();
 
-    @SuppressWarnings({"unused", "FieldCanBeLocal"}) // Used natively
+        for (Method method : clazz.getDeclaredMethods())
+        {
+            if (!method.isAnnotationPresent(EventListener.class)) continue;
+
+            Class<?>[] params = method.getParameterTypes();
+            if (params.length != 1 || !Event.class.isAssignableFrom(params[0])) continue;
+
+            method.setAccessible(true);
+            EventListener listener = method.getAnnotation(EventListener.class);
+            int priority = listener.priority();
+            boolean receiveCanceled = listener.receiveCanceled();
+
+            Class<? extends Event> eventClass = (Class<? extends Event>) params[0];
+            Invoker invoker = (event) ->
+            {
+                if (((Event) event).isCanceled() && !receiveCanceled) return;
+
+                try
+                {
+                    method.invoke(subscriber, event);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            };
+
+            InvokerNode node = new InvokerNode(invoker, subscriber, priority);
+            nodes.add(node);
+
+            event2InvokerMap.computeIfAbsent(eventClass, k -> new ArrayList<>()).add(node);
+            event2InvokerMap.get(eventClass).sort(Comparator.comparingInt(n -> -n.priority));
+        }
+
+        subscriber2NodesMap.put(subscriber, nodes);
+        return subscriber;
+    }
+
+    /**
+     * Unsubscribe an object from receiving events
+     */
+    public Object unsubscribe(Object subscriber)
+    {
+        if (subscriber == null) return null;
+
+        List<InvokerNode> nodes = subscriber2NodesMap.remove(subscriber);
+        if (nodes != null)
+        {
+            for (InvokerNode node : nodes)
+            {
+                event2InvokerMap.values().forEach(list -> list.remove(node));
+            }
+        }
+
+        return subscriber;
+    }
+
+
+    @SuppressWarnings({"unused", "FieldCanBeLocal"})
     public final static class InvokerNode
     {
-        private final InvokerNode next;
         private final Invoker invoker;
         private final Object subscriber;
-        private final Integer priority; // not int, for objectfuscation in bonfuscator
+        private final Integer priority;
 
-        private InvokerNode(Object invoker,
-                            Object subscriber,
-                            Object priority)
+        public InvokerNode(Invoker invoker, Object subscriber, Integer priority)
         {
-            this.next = null;
-            this.invoker = (Invoker) invoker;
+            this.invoker = invoker;
             this.subscriber = subscriber;
-            this.priority = (Integer) priority;
+            this.priority = priority;
         }
     }
 
