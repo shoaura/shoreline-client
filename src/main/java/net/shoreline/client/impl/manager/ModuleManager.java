@@ -51,6 +51,7 @@ public final class ModuleManager
                 new AutoCrawlTrapModule(),
                 new AutoCrystalModule(),
                 new AutoLogModule(),
+                new AutoMaceModule(),
                 // new AutoRegearModule(),
                 new AutoTotemModule(),
                 new AutoTrapModule(),
