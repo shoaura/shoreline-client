@@ -41,6 +41,12 @@ public class AutoXPModule extends RotationModule
         INSTANCE = this;
     }
 
+    @Override
+    public void onEnable()
+    {
+        delayTimer.reset();
+    }
+
     public static AutoXPModule getInstance()
     {
         return INSTANCE;
@@ -55,58 +61,71 @@ public class AutoXPModule extends RotationModule
     @EventListener
     public void onPlayerTick(PlayerTickEvent event)
     {
-
-        if (mc.player == null || !delayTimer.passed(delayConfig.getValue()))
+        try
         {
-            return;
-        }
-
-        if (mc.player.isUsingItem() && !multiTaskConfig.getValue())
-        {
-            return;
-        }
-
-        if (durabilityCheckConfig.getValue() && areItemsFullDura(mc.player))
-        {
-            disable();
-            return;
-        }
-
-        int slot = -1;
-        for (int i = 0; i < 9; i++)
-        {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            if (stack.getItem() instanceof ExperienceBottleItem)
-            {
-                slot = i;
-                break;
-            }
-        }
-        if (slot == -1)
-        {
-            disable();
-            return;
-        }
-
-        Managers.INVENTORY.setSlot(slot);
-        if (rotateConfig.getValue())
-        {
-            setRotation(mc.player.getYaw(), 90.0f);
-            if (isRotationBlocked())
+            if (mc.player == null || !delayTimer.passed(delayConfig.getValue()))
             {
                 return;
             }
-        }
-        for (int i = 0; i < shiftTicksConfig.getValue(); i++)
-        {
-            Managers.NETWORK.sendSequencedPacket(id -> new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, id, mc.player.getYaw(), mc.player.getPitch()));
-            if (swingConfig.getValue())
+
+            if (mc.player.isUsingItem() && !multiTaskConfig.getValue())
             {
-                mc.player.swingHand(Hand.MAIN_HAND);
+                return;
             }
+
+            if (durabilityCheckConfig.getValue() && areItemsFullDura(mc.player))
+            {
+                disable();
+                return;
+            }
+
+            int slot = -1;
+            for (int i = 0; i < 9; i++)
+            {
+                ItemStack stack = mc.player.getInventory().getStack(i);
+                if (stack.getItem() instanceof ExperienceBottleItem)
+                {
+                    slot = i;
+                    break;
+                }
+            }
+            if (slot == -1)
+            {
+                disable();
+                return;
+            }
+
+            Managers.INVENTORY.setSlot(slot);
+            if (rotateConfig.getValue())
+            {
+                setRotation(mc.player.getYaw(), 90.0f);
+                if (isRotationBlocked())
+                {
+                    return;
+                }
+            }
+            for (int i = 0; i < shiftTicksConfig.getValue(); i++)
+            {
+                try
+                {
+                    Managers.NETWORK.sendSequencedPacket(id -> new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, id, mc.player.getYaw(), mc.player.getPitch()));
+                    if (swingConfig.getValue())
+                    {
+                        mc.player.swingHand(Hand.MAIN_HAND);
+                    }
+                }
+                catch (Exception e)
+                {
+                    // Ignore packet send errors
+                }
+            }
+            Managers.INVENTORY.syncToClient();
+            delayTimer.reset();
         }
-        Managers.INVENTORY.syncToClient();
-        delayTimer.reset();
+        catch (Exception e)
+        {
+            disable();
+        }
     }
 
     private boolean areItemsFullDura(PlayerEntity player)

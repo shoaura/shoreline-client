@@ -61,7 +61,9 @@ public final class EventBus
         List<InvokerNode> nodes = new ArrayList<>();
         Class<?> clazz = subscriber.getClass();
 
-        for (Method method : clazz.getDeclaredMethods())
+        // Get all methods including inherited ones
+        Method[] allMethods = clazz.getMethods();
+        for (Method method : allMethods)
         {
             if (!method.isAnnotationPresent(EventListener.class)) continue;
 
