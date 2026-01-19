@@ -78,6 +78,7 @@ jar {
 tasks.register('buildClientOnly') {
     doFirst {
         tasks.remapLoader.enabled = false
+        tasks.remapClient.enabled = false
     }
 
     finalizedBy 'build'
@@ -278,7 +279,7 @@ tasks.register('remapClient', Exec) {
     dependsOn tasks.remapLoader
 }
 
-build.dependsOn(loaderJar, clientJar, remapLoader, remapClient)
+build.dependsOn(clientJar)
 
 def execute(String cmd) {
     try {
